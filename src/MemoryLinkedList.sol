@@ -5,13 +5,12 @@
 pragma solidity ^0.8;
 
 // A typed pointer to a node.
-type node_ptr is uint64;
+type node_ptr is uint48;
 // A pointer to a node's data.
-// Unless the data fits entirely in a `uint64`, applications must allocate their data in memory
+// Unless the data fits entirely in a 42 bits (NOT 48), applications must allocate their data in memory
 // (by using a reference type such as a struct) and use assembly to wrap the pointer into
 // a `data_ptr` type. For most cases, the assembly will be a trivial assignment.
-type data_ptr is uint64;
-
+type data_ptr is uint48;
 
 // The top-level data structure for a generic linked list.
 // Intended to be consumed with `using LibLinkedList for LL`.
@@ -23,6 +22,9 @@ struct LL {
 }
 
 node_ptr constant NULL_NODE_PTR = node_ptr.wrap(0);
+uint256 constant FIELD_SIZE_BITS = 42; // ~4TB addressable ("uint42")
+uint256 constant NODE_SIZE_BYTES = 16;
+uint256 constant UINT42_BITMASK = 0x3ffffffffff;
 
 // Check if a node != NULL_NODE_PTR.
 function isValidNode(node_ptr node) pure returns (bool) {
@@ -36,7 +38,7 @@ function validateNode(node_ptr node) pure {
 
 function validateDataPtr(data_ptr data) pure {
     assembly ("memory-safe") {
-        if gt(data, 0xffffffffffffffff) {
+        if gt(data, 0x3ffffffffff) {
             // Panic(uint256(0x21))
             mstore(0x00, hex"4e487b71")
             mstore(0x04, 0x21)
@@ -50,25 +52,24 @@ function getNode(node_ptr node)
     pure
     returns (data_ptr data, node_ptr prev, node_ptr next)
 {
-    // `node` points to memory location where 3 uint64s are packed
-    // into a single 256-bit word:
+    // `node` points to memory location where 3 uint42s are packed
+    // into the upper half of a single 128-bit half word:
     //      +----------+--------+----------------+
     //      | bits     | type   | detail         |
     //      +----------+--------+----------------+
-    //      | 192-256  | uint64 | data ptr       |
-    //      | 128-192  | uint64 | prev node ptr  |
-    //      | 64-128   | uint64 | next node ptr  |
+    //      | 214-256  | uint42 | data ptr       |
+    //      | 172-214  | uint42 | prev node ptr  |
+    //      | 130-172  | uint42 | next node ptr  |
     //      +----------+--------+----------------+
-    // Note that the lower 64 bits are not used. In theory we could alloc only 24 bytes for
-    // each node to further reduce memory expansion cost.
+    // Note that the lowest 2 bits (128-130) of the half word are unused.
     assembly ("memory-safe") {
         let w := mload(node)
-        // w >> 192
-        data := shr(192, w)
-        // (w << 64) >> 192
-        prev := shr(192, shl(64, w))
-        // (w << 128) >> 192
-        next := shr(192, shl(128, w))
+        // w >> 214
+        data := and(shr(214, w), UINT42_BITMASK)
+        // (w << 42) >> 214
+        prev := and(shr(214, shl(42, w)), UINT42_BITMASK)
+        // (w << 128) >> 214
+        next := and(shr(214, shl(84, w)), UINT42_BITMASK)
     }
 }
 
@@ -79,13 +80,13 @@ function setNode(node_ptr node, data_ptr data, node_ptr prev, node_ptr next)
     validateDataPtr(data);
     assembly ("memory-safe") {
         mstore(
-            node,
+            and(node, not(hex"ffffffffffffffffffffffffffffffff")),
             or(
                 or(
-                    shl(192, data),
-                    shl(128, prev)
+                    shl(214, data),
+                    shl(172, prev)
                 ),
-                shl(64, next)
+                shl(130, next)
             )
         )
     }
@@ -98,7 +99,7 @@ function allocNode(data_ptr data, node_ptr prev, node_ptr next)
 {
     assembly ("memory-safe") {
         node := mload(0x40)
-        mstore(0x40, add(node, 0x20))
+        mstore(0x40, add(node, NODE_SIZE_BYTES))
     }
     setNode(node, data, prev, next);
 }
@@ -187,8 +188,8 @@ library LibLinkedListNode {
             mstore(
                 node,
                 or(
-                    and(mload(node), not(hex"ffffffffffffffff")),
-                    shl(192, data_)
+                    and(mload(node), not(hex"03ffffffffff")),
+                    shl(214, data_)
                 )
             )
         }
