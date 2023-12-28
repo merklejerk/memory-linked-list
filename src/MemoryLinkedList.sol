@@ -204,19 +204,21 @@ library LibLinkedList {
     function at(LL memory ll, uint256 idx)
         internal pure returns (node_ptr node)
     {
-        require(idx < ll.length, 'LL: OOB');
-        if (idx <= ll.length / 2) {
-            node = ll.head;
-            while (idx != 0) {
-                node = node.next();
-                --idx;
-            }
-        } else {
-            node = ll.tail;
-            uint256 t = ll.length - 1;
-            while (idx != t) {
-                node = node.prev();
-                ++idx;
+        unchecked {
+            require(idx < ll.length, 'LL: OOB');
+            if (idx <= ll.length / 2) {
+                node = ll.head;
+                while (idx != 0) {
+                    node = node.next();
+                    --idx;
+                }
+            } else {
+                node = ll.tail;
+                uint256 t = ll.length - 1;
+                while (idx != t) {
+                    node = node.prev();
+                    ++idx;
+                }
             }
         }
     }
@@ -244,7 +246,7 @@ library LibLinkedList {
                 return (node, idx);
             }
             node = node.next();
-            ++idx;
+            unchecked { ++idx; }
         }
         return (node, type(uint256).max);
     }
@@ -260,7 +262,7 @@ library LibLinkedList {
         idx = ll.length;
         node = ll.tail;
         while (isValidNode(node)) {
-            --idx;
+            unchecked { --idx; }
             if (isNeedle(node, idx, callerData)) {
                 return (node, idx);
             }
@@ -280,10 +282,11 @@ library LibLinkedList {
         uint256 idx;
         node_ptr node = ll.head;
         while (isValidNode(node)) {
-            if (!onNode(node, idx++, callerData)) {
+            if (!onNode(node, idx, callerData)) {
                 break;
             }
             node = node.next();
+            unchecked { ++idx; }
         }
         return ll;
     }
@@ -299,7 +302,8 @@ library LibLinkedList {
         uint256 idxP1 = ll.length;
         node_ptr node = ll.tail;
         while (isValidNode(node)) {
-            if (!onNode(node, --idxP1, callerData)) {
+            unchecked { --idxP1; }
+            if (!onNode(node, idxP1, callerData)) {
                 break;
             }
             node = node.prev();

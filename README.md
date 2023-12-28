@@ -4,7 +4,9 @@ A space-efficient, "generic", memory-only, doubly linked list implementation wri
 ⚠️ This project hasn't been audited; use at your own risk! ⚠️
 
 ### Key Features
-The biggest difference between this from other solidity linked list implementations is that it does not use storage at all. By using memory pointers as the data stored in each node, any reference type (structs, arrays, etc) can be indexed by the linked list by defining a simple casting function (see [example](#example)).
+* The biggest difference between this from other solidity linked list implementations is that it does not use storage at all.
+* By using memory pointers as the data stored in each node, any reference type (structs, arrays, etc) can be indexed by the linked list by defining a simple casting function (see [example](#example)).
+* It's also quite space-efficient, with each new node only expanding memory by 16 bytes (half a word).
 
 ## Installation
 To use in your foundry project, install this repo as a dependency:
