@@ -204,6 +204,16 @@ contract MemoryLinkedListTest is Test {
         ll.push(_toDataPtr(Data(vals[3])));
         _assert4ListLinks(ll, vals);
     }
+    function test_4List_at() external {
+        LL memory ll = _create4List([uint256(1337), uint256(2337), uint256(3337), uint256(4337)]);
+        assertEq(ll.length, 4);
+        assertEq(_fromDataPtr(ll.at(0).data()).x, 1337);
+        assertEq(_fromDataPtr(ll.at(1).data()).x, 2337);
+        assertEq(_fromDataPtr(ll.at(2).data()).x, 3337);
+        assertEq(_fromDataPtr(ll.at(3).data()).x, 4337);
+        vm.expectRevert('LL: OOB');
+        ll.at(4);
+    }
 
     function test_3List_at() external {
         LL memory ll = _create3List([uint256(1337), uint256(2337), uint256(3337)]);
@@ -288,8 +298,8 @@ contract MemoryLinkedListTest is Test {
    
     function test_2List_insertBefore() external {
         LL memory ll = _create2List([uint256(1337), uint256(2337)]);
-        ll.insertBefore(ll.head.next(), _toDataPtr(Data(555)))
-            .insertBefore(LibLinkedListNode.NULL, _toDataPtr(Data(888)));
+        ll.insertBefore(ll.head.next(), _toDataPtr(Data(555)));
+        ll.insertBefore(LibLinkedListNode.NULL, _toDataPtr(Data(888)));
         _assert4ListLinks(ll, [uint256(1337), uint256(555), uint256(2337), uint256(888)]);
         ll.shift();
         ll.insertBefore(ll.head, _toDataPtr(Data(111)));
@@ -328,9 +338,10 @@ contract MemoryLinkedListTest is Test {
         ll.push(_toDataPtr(Data(uint256(2337))));
         vm.expectRevert('LL: Null node');
         ll.remove(LibLinkedListNode.NULL);
+        _assertCleanMemory(ll);
     }
 
-    function test_find(uint256 n) external {
+    function testFuzz_find(uint256 n) external {
         uint256[4] memory vals = [uint256(1337), uint256(2337), uint256(3337), uint256(4337)];
         uint256 needleIdx = n % vals.length;
         uint256 needleValue = vals[needleIdx];
@@ -426,6 +437,54 @@ contract MemoryLinkedListTest is Test {
         }
     }
 
+    function testFuzz_bigList_canWalkForwards(uint8 n) external {
+        LL memory ll;
+        for (uint256 i; i < n; ++i) {
+            ll.push(_toDataPtr(Data(i)));
+        }
+        node_ptr node = ll.head;
+        uint256 idx;
+        while (node.isValid()) {
+            assertEq(_fromDataPtr(node.data()).x, idx);
+            if (idx == n - 1) {
+                _assertSameNodePtr(node, ll.tail);
+            }
+            node = node.next();
+            ++idx;
+        }
+    }
+
+    function testFuzz_bigList_canWalkBackwards(uint8 n) external {
+        LL memory ll;
+        for (uint256 i; i < n; ++i) {
+            ll.push(_toDataPtr(Data(i)));
+        }
+        node_ptr node = ll.tail;
+        uint256 idx;
+        while (node.isValid()) {
+            assertEq(_fromDataPtr(node.data()).x, n - idx - 1);
+            if (idx == n - 1) {
+                _assertSameNodePtr(node, ll.head);
+            }
+            node = node.prev();
+            ++idx;
+        }
+    }
+
+    function testFuzz_bigList_canAt(uint8 n) external {
+        LL memory ll;
+        for (uint256 i; i < n; ++i) {
+            ll.push(_toDataPtr(Data(i)));
+        }
+        for (uint256 i; i < n; ++i) {
+            node_ptr node = ll.at(i);
+            assertEq(_fromDataPtr(node.data()).x, i);
+            if (i == n - 1) {
+                _assertSameNodePtr(node, ll.tail);
+            }
+        }
+    }
+
     function _toArrayCallback(node_ptr node, uint256 idx, bytes memory callerData)
         private pure returns (bool)
     {
@@ -458,6 +517,7 @@ contract MemoryLinkedListTest is Test {
         assertFalse(ll.tail.prev().isValid());
         assertEq(_fromDataPtr(ll.head.data()).x, vals[0]);
         _assertSameNodePtr(ll.head, ll.tail);
+        _assertCleanMemory(ll);
     }
 
     function _assert2ListLinks(LL memory ll, uint256[2] memory vals) private {
@@ -470,6 +530,7 @@ contract MemoryLinkedListTest is Test {
         assertEq(_fromDataPtr(ll.tail.data()).x, vals[1]);
         _assertSameNodePtr(ll.head.next(), ll.tail);
         _assertSameNodePtr(ll.tail.prev(), ll.head);
+        _assertCleanMemory(ll);
     }
 
     function _assert3ListLinks(LL memory ll, uint256[3] memory vals) private {
@@ -483,6 +544,7 @@ contract MemoryLinkedListTest is Test {
         assertEq(_fromDataPtr(ll.tail.data()).x, vals[2]);
         assertEq(_fromDataPtr(ll.tail.prev().data()).x, vals[1]);
         _assertSameNodePtr(ll.head.next(), ll.tail.prev());
+        _assertCleanMemory(ll);
     }
 
     function _assert4ListLinks(LL memory ll, uint256[4] memory vals) private {
@@ -497,6 +559,7 @@ contract MemoryLinkedListTest is Test {
         assertEq(_fromDataPtr(ll.tail.prev().data()).x, vals[2]);
         _assertSameNodePtr(ll.head.next().next(), ll.tail.prev());
         _assertSameNodePtr(ll.tail.prev().prev(), ll.head.next());
+        _assertCleanMemory(ll);
     }
 
     function _create4List(uint256[4] memory xs) private pure returns (LL memory ll) {
@@ -550,6 +613,23 @@ contract MemoryLinkedListTest is Test {
             mstore(0x00, seed)
             r := keccak256(0x00, 0x20)
         }
+    }
+   
+    function _assertCleanMemory(LL memory ll) private {
+        node_ptr node = ll.head;
+        while (node.isValid()) {
+            bytes16 hw;
+            assembly ("memory-safe") { hw := shl(128, shr(128, mload(node))) }
+            // Ensure unused bits are 0 (lowest 2 bits).
+            assertEq(hw & bytes16(uint128(3)), 0x0, 'unused bits in node half word');
+            node = node.next();
+        }
+        // Assert that the word at the free mem pointer is untouched.
+        bytes32 w;
+        assembly ("memory-safe") {
+            w := mload(mload(0x40))
+        }
+        assertEq(w, 0x0, 'nonzero data in free memory!');
     }
 
     function _assertSameDataInstance(Data memory a, Data memory b) private {

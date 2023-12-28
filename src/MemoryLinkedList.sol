@@ -14,7 +14,6 @@ type data_ptr is uint48;
 
 // The top-level data structure for a generic linked list.
 // Intended to be consumed with `using LibLinkedList for LL`.
-// Most functions in this library return the LL instance for chaining.
 struct LL {
     uint256 length;
     node_ptr head;
@@ -77,16 +76,19 @@ function getNode(node_ptr node)
 function setNode(node_ptr node, data_ptr data, node_ptr prev, node_ptr next)
     pure returns (node_ptr)
 {
-    validateDataPtr(data);
     assembly ("memory-safe") {
         mstore(
-            and(node, not(hex"ffffffffffffffffffffffffffffffff")),
+            node,
             or(
+                // Only replace the upper 16 bytes of word.
+                shr(128, shl(128, mload(node))),
                 or(
-                    shl(214, data),
-                    shl(172, prev)
-                ),
-                shl(130, next)
+                    or(
+                        shl(214, data),
+                        shl(172, prev)
+                    ),
+                    shl(130, next)
+                )
             )
         )
     }
@@ -161,6 +163,7 @@ library LibLinkedListNode {
         internal pure returns (node_ptr)
     {
         validateNode(node);
+        validateDataPtr(data_);
         _set(node, data_);
         return node;
     }
@@ -187,8 +190,9 @@ library LibLinkedListNode {
         assembly ("memory-safe") {
             mstore(
                 node,
+                // Only replace upper 42 bits of word.
                 or(
-                    and(mload(node), not(hex"03ffffffffff")),
+                    shr(42, shl(42, mload(node))),
                     shl(214, data_)
                 )
             )
@@ -206,7 +210,7 @@ library LibLinkedList {
     {
         unchecked {
             require(idx < ll.length, 'LL: OOB');
-            if (idx <= ll.length / 2) {
+            if (idx < ll.length / 2) {
                 node = ll.head;
                 while (idx != 0) {
                     node = node.next();
@@ -225,11 +229,10 @@ library LibLinkedList {
 
     // Empty out the list.
     function clear(LL memory ll)
-        internal pure returns (LL memory)
+        internal pure
     {
         ll.head = ll.tail = NULL_NODE_PTR;
         ll.length = 0;
-        return ll;
     }
 
     // Search through the list using the predicate `isNeedle()`, returning
@@ -278,7 +281,7 @@ library LibLinkedList {
         LL memory ll,
         function (node_ptr, uint256, bytes memory) returns (bool) onNode,
         bytes memory callerData
-    ) internal returns (LL memory) {
+    ) internal {
         uint256 idx;
         node_ptr node = ll.head;
         while (isValidNode(node)) {
@@ -288,7 +291,6 @@ library LibLinkedList {
             node = node.next();
             unchecked { ++idx; }
         }
-        return ll;
     }
 
     // Call an iterator on each node in reverse.
@@ -298,7 +300,7 @@ library LibLinkedList {
         LL memory ll,
         function (node_ptr, uint256, bytes memory) returns (bool) onNode,
         bytes memory callerData
-    ) internal returns (LL memory) {
+    ) internal {
         uint256 idxP1 = ll.length;
         node_ptr node = ll.tail;
         while (isValidNode(node)) {
@@ -308,7 +310,6 @@ library LibLinkedList {
             }
             node = node.prev();
         }
-        return ll;
     }
 
     // Call an iterator on each node (static callback version).
@@ -318,18 +319,18 @@ library LibLinkedList {
         LL memory ll,
         function (node_ptr, uint256, bytes memory) view returns (bool) onNode,
         bytes memory callerData
-    ) internal view returns (LL memory) {
+    ) internal view {
         // Some solidity hacks to reuse non-static code path.
         function (
             LL memory,
             function (node_ptr, uint256, bytes memory) returns (bool),
             bytes memory
-        ) returns (LL memory) fn_ptr = each;
+        ) fn_ptr = each;
         function (
             LL memory,
             function (node_ptr, uint256, bytes memory) view returns (bool),
             bytes memory
-        ) view returns (LL memory) static_fn_ptr;
+        ) view static_fn_ptr;
         assembly ("memory-safe") { static_fn_ptr := fn_ptr }
         return static_fn_ptr(ll, onNode, callerData);
     }
@@ -341,32 +342,38 @@ library LibLinkedList {
         LL memory ll,
         function (node_ptr, uint256, bytes memory) view returns (bool) onNode,
         bytes memory callerData
-    ) internal view returns (LL memory) {
+    ) internal view {
         // Some solidity hacks to reuse non-static code path.
         function (
             LL memory,
             function (node_ptr, uint256, bytes memory) returns (bool),
             bytes memory
-        ) returns (LL memory) fn_ptr = reach;
+        ) fn_ptr = reach;
         function (
             LL memory,
             function (node_ptr, uint256, bytes memory) view returns (bool),
             bytes memory
-        ) view returns (LL memory) static_fn_ptr;
+        ) view static_fn_ptr;
         assembly ("memory-safe") { static_fn_ptr := fn_ptr }
         return static_fn_ptr(ll, onNode, callerData);
     }
 
     // Insert a new node at the end of the list.
     function push(LL memory ll, data_ptr data)
-        internal pure returns (LL memory)
+        internal pure
     {
-        return insertBefore(ll, NULL_NODE_PTR, data);
+        insertBefore(ll, NULL_NODE_PTR, data);
+    }
+
+    function push2(LL memory ll, data_ptr data)
+        internal pure
+    {
+        insertBefore(ll, NULL_NODE_PTR, data);
     }
 
     // Insert a new node at the start of the list.
     function unshift(LL memory ll, data_ptr data)
-        internal pure returns (LL memory)
+        internal pure
     {
         return insertBefore(ll, ll.head, data);
     }
@@ -377,7 +384,7 @@ library LibLinkedList {
     {
         require(isValidNode(ll.tail), 'LL: Empty');
         (data,,) = getNode(ll.tail);
-        remove(ll, ll.tail);
+        _remove(ll, ll.tail);
     }
 
     // Remove a node from the start of the list, returning its data.
@@ -386,14 +393,20 @@ library LibLinkedList {
     {
         require(isValidNode(ll.head), 'LL: Empty');
         (data,,) = getNode(ll.head);
-        remove(ll, ll.head);
+        _remove(ll, ll.head);
     }
 
     // Remove a node from the list.
     function remove(LL memory ll, node_ptr node)
-        internal pure returns (LL memory)
+        internal pure
     {
         validateNode(node);
+        _remove(ll, node);
+    }
+
+    function _remove(LL memory ll, node_ptr node)
+        private pure
+    {
         (data_ptr data, node_ptr prev, node_ptr next) = getNode(node);
         if (isValidNode(prev)) {
             (data_ptr prevData, node_ptr prevPrev,) = getNode(prev);
@@ -409,14 +422,14 @@ library LibLinkedList {
         }
         --ll.length;
         setNode(node, data, NULL_NODE_PTR, NULL_NODE_PTR);
-        return ll;
     }
 
     // Insert a node before another one in the list.
     // To insert to the end, pass `NULL_NODE_PTR` for `beforeNode`.
     function insertBefore(LL memory ll, node_ptr beforeNode, data_ptr data)
-        internal pure returns (LL memory)
+        internal pure
     {
+        validateDataPtr(data);
         node_ptr prev;
         node_ptr node;
         if (isValidNode(beforeNode)) {
@@ -436,6 +449,5 @@ library LibLinkedList {
             ll.head = node;
         }
         ++ll.length;
-        return ll;
     }
 }
