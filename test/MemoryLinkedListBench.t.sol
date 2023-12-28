@@ -101,12 +101,6 @@ contract MemoryLinkedListBenchTest is Test {
         emit log_named_uint('gas per consecutive lookup in at()', totalGasUsed / n);
     }
 
-    function _fib(uint256 n) private pure returns (uint256 r) {
-        for (uint256 i; i < n; ++i) {
-            r += (i + 1);
-        }
-    }
-
     function testMem_perItem() external {
         uint256 memUsage;
         assembly ("memory-safe") { memUsage := mload(0x40) }
