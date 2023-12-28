@@ -36,7 +36,7 @@ function validateNode(node_ptr node) pure {
 
 function validateDataPtr(data_ptr data) pure {
     assembly ("memory-safe") {
-        if gt(data, 0x3ffffffffff) {
+        if gt(data, UINT42_BITMASK) {
             // Panic(uint256(0x21))
             mstore(0x00, hex"4e487b71")
             mstore(0x04, 0x21)
