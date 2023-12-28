@@ -63,11 +63,11 @@ function getNode(node_ptr node)
     assembly ("memory-safe") {
         let w := mload(node)
         // w >> 214
-        data := and(shr(214, w), UINT42_BITMASK)
+        data := shr(214, w)
         // (w << 42) >> 214
-        prev := and(shr(214, shl(42, w)), UINT42_BITMASK)
-        // (w << 128) >> 214
-        next := and(shr(214, shl(84, w)), UINT42_BITMASK)
+        prev := shr(214, shl(42, w))
+        // (w << 84) >> 214
+        next := shr(214, shl(84, w))
     }
 }
 
@@ -79,14 +79,14 @@ function setNode(node_ptr node, data_ptr data, node_ptr prev, node_ptr next)
         mstore(
             node,
             or(
-                // Only replace the upper 16 bytes of word.
-                shr(128, shl(128, mload(node))),
+                // Only replace the upper 126 bits of the word.
+                shr(126, shl(126, mload(node))),
                 or(
                     or(
                         shl(214, data),
-                        shl(172, prev)
+                        shr(42, shl(214, prev))
                     ),
-                    shl(130, next)
+                    shr(84, shl(214, next))
                 )
             )
         )

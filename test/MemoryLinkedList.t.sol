@@ -7,7 +7,10 @@ import {
     LibLinkedList,
     LibLinkedListNode,
     node_ptr,
-    data_ptr
+    data_ptr,
+    setNode,
+    getNode,
+    UINT42_BITMASK
 } from "../src/MemoryLinkedList.sol";
 
 contract MemoryLinkedListTest is Test {
@@ -23,6 +26,37 @@ contract MemoryLinkedListTest is Test {
         _assertSameDataPtr(_toDataPtr(data), _toDataPtr(data));
         _assertSameDataInstance(_fromDataPtr(_toDataPtr(data)), data);
         assertEq(_fromDataPtr(_toDataPtr(data)).x, data.x);
+    }
+
+    function testFuzz_setNode_withDirtyBits(
+        bytes32 dirt,
+        uint48 data,
+        uint48 prev,
+        uint48 next
+    ) external {
+        node_ptr node;
+        assembly ("memory-safe") {
+            node := mload(0x40)
+            mstore(0x40, add(node, 0x20))
+            // Dirty the word.
+            mstore(node, dirt)
+        }
+        // Only the top 126 bits should be accessible to setWord.
+        setNode(
+            node,
+            data_ptr.wrap(data),
+            node_ptr.wrap(prev),
+            node_ptr.wrap(next)
+        );
+        bytes32 word;
+        assembly ("memory-safe") {
+            word := mload(node)
+        }
+        assertEq((word << 126) >> 126, (dirt << 126) >> 126, 'lower bits');
+        (data_ptr data_, node_ptr prev_, node_ptr next_) = getNode(node);
+        assertEq(data_ptr.unwrap(data_), data & uint48(UINT42_BITMASK), 'data');
+        assertEq(node_ptr.unwrap(prev_), prev & uint48(UINT42_BITMASK), 'prev');
+        assertEq(node_ptr.unwrap(next_), next & uint48(UINT42_BITMASK), 'next');
     }
 
     function test_emptyList() external {
