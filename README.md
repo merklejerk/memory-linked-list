@@ -105,6 +105,17 @@ contract ToyExample {
 
 You can find many more examples in the [tests](./test/MemoryLinkedList.t.sol)!
 
+## Benchmarks
+
+[Benchmarks](./test/MemoryLinkedListBench.t.sol) are run with `via_ir=true`.
+
+| Feature                           | Cost      |
+|-----------------------------------|-----------|
+| Memory expansion per item         | 16 bytes  |
+| `push()`/`unshift()`              | ~500 gas  |
+| `pop()`/`shift()`                 | ~600 gas  |
+| `at(i)` per `i` (max `N / 2`)     | ~150 gas  |
+
 ## Development
 
 This is a [foundry](https://getfoundry.sh/) projects, so it's the usual:

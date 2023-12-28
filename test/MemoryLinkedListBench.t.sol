@@ -58,6 +58,19 @@ contract MemoryLinkedListBenchTest is Test {
         emit log_named_uint('gas per unshift()', gasUsed / NUM_SAMPLES);
     }
 
+    function testGas_insertBefore_between() external gasTest {
+        LL memory ll = _createList(3);
+        node_ptr tail = ll.tail;
+        _startGas();
+        unchecked {
+            for (uint256 i; i < NUM_SAMPLES; ++i) {
+                ll.insertBefore(tail, DUMMY_DATA_PTR);
+            }
+        }
+        uint256 gasUsed = _stopGas();
+        emit log_named_uint('gas per insertBefore()', gasUsed / NUM_SAMPLES);
+    }
+
     function testGas_pop() external gasTest {
         LL memory ll = _createList(NUM_SAMPLES);
         _startGas();
