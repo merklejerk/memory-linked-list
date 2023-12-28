@@ -1,5 +1,7 @@
-# MemoryLinkedList
-A space efficient, "generic", memory-only, doubly linked list implementation written in solidity. Use this if you want cheap, incremental resizing of a list, O(1) insertions/deletions, and don't mind O(N) lookups.
+# Memory Linked List
+A space-efficient, "generic", memory-only, doubly linked list implementation written in solidity. Use this if you want cheap, incremental resizing of a list, O(1) insertions/deletions, and don't mind O(n/2) lookups.
+
+⚠️ This project hasn't been audited; use at your own risk! ⚠️
 
 ### Key Features
 The biggest difference between this from other solidity linked list implementations is that it does not use storage at all. By using memory pointers as the data stored in each node, any reference type (structs, arrays, etc) can be indexed by the linked list by defining a simple casting function (see [example](#example)).
@@ -14,6 +16,7 @@ $> forge install merklejerk/memory-linked-list
 ## Example
 
 ```solidity
+pragma solidity ^0.8;
 import { LibLinkedList, LibLinkedListNode, data_ptr, node_ptr, LL } from 'memory-linked-list/MemoryLinkedList.sol';
 
 contract ToyExample {
