@@ -17,7 +17,8 @@ $> forge install merklejerk/memory-linked-list
 
 ```solidity
 pragma solidity ^0.8;
-import { LibLinkedList, LibLinkedListNode, data_ptr, node_ptr, LL } from 'memory-linked-list/MemoryLinkedList.sol';
+import { LibLinkedList, LibLinkedListNode, data_ptr, node_ptr, LL }
+    from 'memory-linked-list/src/MemoryLinkedList.sol';
 
 contract ToyExample {
     using LibLinkedListNode for node_ptr;
