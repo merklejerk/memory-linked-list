@@ -34,6 +34,17 @@ function validateNode(node_ptr node) pure {
     require(isValidNode(node), 'LL: Null node');
 }
 
+function validateDataPtr(data_ptr data) pure {
+    assembly ("memory-safe") {
+        if gt(data, 0xffffffffffffffff) {
+            // Panic(uint256(0x21))
+            mstore(0x00, hex"4e487b71")
+            mstore(0x04, 0x21)
+            revert(0x00, 0x24)
+        }
+    }
+}
+
 // Extract a node's fields.
 function getNode(node_ptr node)
     pure
@@ -65,6 +76,7 @@ function getNode(node_ptr node)
 function setNode(node_ptr node, data_ptr data, node_ptr prev, node_ptr next)
     pure returns (node_ptr)
 {
+    validateDataPtr(data);
     assembly ("memory-safe") {
         mstore(
             node,
@@ -170,13 +182,8 @@ library LibLinkedListNode {
     function _set(node_ptr node, data_ptr data_)
         private pure
     {
+        validateDataPtr(data_);
         assembly ("memory-safe") {
-            if gt(data_, 0xffffffffffffffff) {
-                // Panic(uint256(0x21))
-                mstore(0x00, hex"4e487b71")
-                mstore(0x04, 0x21)
-                revert(0x00, 0x24)
-            }
             mstore(
                 node,
                 or(
