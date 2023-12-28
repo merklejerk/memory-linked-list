@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT
 // "Generic", memory-only/in-memory, doubly-linked list library for solidity.
 // Author: @merklejerk
-// Warning: This code has not been audited. Use at your own risk.
 pragma solidity ^0.8;
 
 // A typed pointer to a node.

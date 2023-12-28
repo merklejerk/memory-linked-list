@@ -112,7 +112,7 @@ contract MemoryLinkedListBenchTest is Test {
         assembly ("memory-safe") { memUsage := mload(0x40) }
         _createList(1024);
         assembly ("memory-safe") { memUsage := sub(mload(0x40), memUsage) }
-        emit log_named_uint('mem usage per item', memUsage / 1024);
+        emit log_named_uint('mem usage per item (bytes)', memUsage / 1024);
     }
 
     function _createList(uint256 size) private pure returns (LL memory ll) {
