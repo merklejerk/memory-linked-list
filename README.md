@@ -52,7 +52,7 @@ contract ToyExample {
         // Remove the second item (which will be what we just added).
         ll.remove(ll.at(1));
         // Remove the first item and emit it.
-        emit Logdata(_fromDataPtr(ll.shift().data()));
+        emit LogData(_fromDataPtr(ll.shift().data()));
         // Walk through all entries and emit each one.
         {
             node_ptr node = ll.head;
